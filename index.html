@@ -1,0 +1,212 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <title>Porsche Q&amp;A</title>
+    <!-- Bootstrap core CSS -->
+    <!--<link href="css/bootstrap.min.css" rel="stylesheet">-->
+</head>
+
+<body>
+    <div class="navbar-wrapper">
+        <div class="container">
+            <h1>Porsche Q&amp;A</h1>
+            <hr />
+        </div>
+    </div>
+    <!-- Wrap the rest of the page in another container to center all the content. -->
+    <div class="container">
+        <!-- UI code goes here -->
+        <div id="warning">
+            <h1 style="font-weight:500;">Speech Recognition Speech SDK not found (microsoft.cognitiveservices.speech.sdk.bundle.js missing).</h1>
+        </div>
+
+        <div id="content" style="display:none">
+            <table width="100%">
+                <tr>
+                    <td align="right"><a href="https://docs.microsoft.com/azure/cognitive-services/speech-service/get-started" target="_blank">Subscription</a>:</td>
+                    <td><input id="subscriptionKey" type="text" size="40" value="fa42ecb98ab541bd9cff0bb73a308653"></td>
+                </tr>
+                <tr>
+                    <td align="right">Region</td>
+                    <td><input id="regionKey" type="text" size="40" value="westeurope"></td>
+                </tr>
+                <tr>
+                    <td></td>
+                    <td><button id="startRecognizeOnceAsyncButton">Start recognition</button></td>
+                </tr>
+                <tr>
+                    <td align="right" valign="top">Results</td>
+                    <td><textarea id="phraseDiv" style="display: inline-block;width:500px;height:200px"></textarea></td>
+                </tr>
+            </table>
+        </div>
+    </div>
+    <!-- Bootstrap core JavaScript
+    ================================================== -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <!--<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+    <script>window.jQuery || document.write('<script src="../../assets/js/vendor/jquery.min.js"><\/script>')</script>
+    <script src="js/bootstrap.min.js"></script>-->
+    <!-- SDK reference goes here -->
+    <!-- Speech SDK reference sdk. -->
+    <script src="js/microsoft.cognitiveservices.speech.sdk.bundle.js"></script>
+
+    <!-- Optional authorization token request goes here -->
+    <!-- Speech SDK Authorization token -->
+    <script>
+        // Note: Replace the URL with a valid endpoint to retrieve
+        //       authorization tokens for your subscription.
+        var authorizationEndpoint = "php/token.php";
+
+        function RequestAuthorizationToken() {
+            if (authorizationEndpoint) {
+                var a = new XMLHttpRequest();
+                a.open("GET", authorizationEndpoint);
+                a.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+                a.send("");
+                a.onload = function () {
+                    var token = JSON.parse(atob(this.responseText.split(".")[1]));
+                    regionKey.value = token.region;
+                    authorizationToken = this.responseText;
+                    subscriptionKey.disabled = true;
+                    subscriptionKey.value = "using authorization token (hit F5 to refresh)";
+                    console.log("Got an authorization token: " + token);
+                }
+            }
+        }
+    </script>
+
+    <!-- QnA code goes here-->
+    <script>
+        function QnAQuery(textInput) {
+            phraseDiv.innerHTML += "\nText input: " + textInput;
+
+            var kb = "c3808a7f-1761-4adb-921d-8ade12180b89";
+            var method = "/qnamaker/knowledgebases/" + kb + "/generateAnswer";
+            var host = "https://gaqna.azurewebsites.net";
+            var endpoint_key = "890f83c8-110c-413f-abdd-4cbb4d770ed3";
+
+            // insert text input into json string request
+            var question = {
+                'question': textInput,
+                'top': 1
+            };
+
+            // convert request to a string
+            var content = JSON.stringify(question);
+            phraseDiv.innerHTML += "\ncontent: " + content;
+
+            var post = function (content) {
+                // Pass the callback function to the response handler.
+                var http = new XMLHttpRequest();
+                http.open('POST', host + method, true);
+                http.setRequestHeader('Content-Type', 'application/json');
+                http.setRequestHeader('Authorization', 'EndpointKey ' + endpoint_key);
+                http.onload = function () {//Call a function when the state changes.
+                    //phraseDiv.innerHTML += "\nHttp status code: " + http.status;
+                    //phraseDiv.innerHTML += "\nAnswer: " + http.responseText;
+                    var data = http.responseText;
+                    var jsonData = JSON.parse(data);
+                    console.log(jsonData.answers[0].answer);
+                    phraseDiv.innerHTML += "\n\nQnA Reply: " + jsonData.answers[0].answer;
+                }
+                http.send(content);
+            }
+
+            var get_answers = function (req) {
+                console.log('Calling ' + host + method);
+                //phraseDiv.innerHTML += '\nCalling ' + host + path;
+
+                // Send the POST request.
+                post(req);
+            }
+
+            // get QnA query
+            get_answers(content);
+        }
+    </script>
+
+    <!-- Sample code goes here -->
+    <!-- Speech SDK USAGE -->
+    <script>
+        // status fields and start button in UI
+        var phraseDiv;
+        var startRecognizeOnceAsyncButton;
+
+        // subscription key and region key for speech services.
+        var subscriptionKey, regionKey;
+        var authorizationToken;
+        var SpeechSDK;
+        var recognizer;
+
+        document.addEventListener("DOMContentLoaded", function () {
+            startRecognizeOnceAsyncButton = document.getElementById("startRecognizeOnceAsyncButton");
+            subscriptionKey = document.getElementById("subscriptionKey");
+            regionKey = document.getElementById("regionKey");
+            phraseDiv = document.getElementById("phraseDiv");
+
+            startRecognizeOnceAsyncButton.addEventListener("click", function () {
+                startRecognizeOnceAsyncButton.disabled = true;
+                phraseDiv.innerHTML = "";
+
+                // if we got an authorization token, use the token. Otherwise use the provided subscription key
+                var speechConfig;
+                if (authorizationToken) {
+                    speechConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(authorizationToken, regionKey.value);
+                } else {
+                    if (subscriptionKey.value === "" || subscriptionKey.value === "subscription") {
+                        alert("Please enter your Microsoft Cognitive Services Speech subscription key!");
+                        return;
+                    }
+                    speechConfig = SpeechSDK.SpeechConfig.fromSubscription(subscriptionKey.value, regionKey.value);
+                }
+
+                // recognize speech here
+                speechConfig.speechRecognitionLanguage = "de-DE";
+                var audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
+                recognizer = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
+
+                recognizer.recognizeOnceAsync(
+                    function (result) {
+                        startRecognizeOnceAsyncButton.disabled = false;
+                        detectedSpeech = result.text;
+                        phraseDiv.innerHTML += "You said: " + detectedSpeech;
+                        window.console.log(result);
+
+                        recognizer.close();
+                        recognizer = undefined;
+
+                        // QnA here
+                        QnAQuery(detectedSpeech);
+                    },
+                    function (err) {
+                        startRecognizeOnceAsyncButton.disabled = false;
+                        phraseDiv.innerHTML += err;
+                        window.console.log(err);
+
+                        recognizer.close();
+                        recognizer = undefined;
+                    });
+            });
+
+            if (!!window.SpeechSDK) {
+                SpeechSDK = window.SpeechSDK;
+                startRecognizeOnceAsyncButton.disabled = false;
+
+                document.getElementById('content').style.display = 'block';
+                document.getElementById('warning').style.display = 'none';
+
+                // in case we have a function for getting an authorization token, call it.
+                if (typeof RequestAuthorizationToken === "function") {
+                    RequestAuthorizationToken();
+                }
+            }
+        });
+    </script>
+</body>
+</html>
